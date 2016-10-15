@@ -88,7 +88,7 @@ module Scrimp
       end.compact
 
       begin
-        transport = Thrift::FramedTransport.new Thrift::Socket.new(invocation['host'], invocation['port'])
+        transport = Thrift::HTTPClientTransport.new (invocation['host'] + (invocation['port'] ? ':' + invocation['port'] : '') + invocation['uri'])
         protocol_class = ThriftUtil.qualified_const invocation['protocol']
         protocol = protocol_class.new transport
         client = service_class.const_get('Client').new protocol

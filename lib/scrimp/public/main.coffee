@@ -6,6 +6,7 @@ default_request = ->
     protocol: (protocol for protocol of Scrimp.protocols)[0]
     host: "localhost"
     port: 9000
+    uri: "/customer/../binary"
     args: {}
   request.function = (func for func of Scrimp.services[request.service])[0]
   request
@@ -152,6 +153,7 @@ load_structured_request = ->
   $('select.protocol-field').val(parsed.protocol)
   $('input.host-field').val(parsed.host)
   $('input.port-field').val(parsed.port)
+  $('input.uri-field').val(parsed.uri)
   true
 
 build_json_for_field = ($el) ->
@@ -191,6 +193,7 @@ build_raw_request = ->
     protocol: $('select.protocol-field').val()
     host: $('input.host-field').val()
     port: $('input.port-field').val()
+    uri: $('input.uri-field').val()
     args: build_json_for_field($('.args-field'))
   request
 
