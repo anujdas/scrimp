@@ -16,7 +16,7 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = Scrimp::VERSION
 
-  gem.add_runtime_dependency 'thrift', '~> 0.9.1'
+  gem.add_runtime_dependency 'thrift'
   gem.add_runtime_dependency 'thin', '~> 1.6.0' # https://issues.apache.org/jira/browse/THRIFT-2145
   gem.add_runtime_dependency 'haml', '~> 4.0.3'
   gem.add_runtime_dependency 'json', '~> 1.8.1'
