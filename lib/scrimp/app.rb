@@ -6,7 +6,7 @@ require 'sinatra/base'
 module Scrimp
   class App < Sinatra::Base
     set :static, true
-    set :public, File.expand_path('../public', __FILE__)
+    set :public_dir, File.expand_path('../public', __FILE__)
     set :views, File.expand_path('../views', __FILE__)
     set :haml, :format => :html5
 
