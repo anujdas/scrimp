@@ -7,7 +7,7 @@ Gem::Specification.new do |gem|
   gem.description   = %q{Web UI for making requests to thrift services, given their IDL files.}
   gem.summary       = %q{Generic UI for thrift services.}
   gem.homepage      = "https://github.com/cerner/scrimp"
-  gem.licenses      = ['Apache 2']
+  gem.licenses      = ['Apache-2.0']
 
   gem.files         = `git ls-files`.split($\)
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }

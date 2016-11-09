@@ -41,4 +41,4 @@ Dir.mktmpdir do |out|
 end
 
 Scrimp::ThriftUtil.extend_structs
-Scrimp::App.run! :port => options[:port]
+Scrimp::App.run! :port => options[:port], :bind => '0.0.0.0'

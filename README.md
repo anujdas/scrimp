@@ -1,3 +1,14 @@
+Scrimp on docker
+
+```sh
+~/scrimp $ docker build --tag scrimp .
+~/thrift-idl-project $ docker run --name scrimp-container -p 7000:7000 -v `pwd`/your_thrift_idl_dir:/thrift -d scrimp
+```
+
+Original README 
+
+---
+
 # Scrimp
 
 This is a tool for testing Thrift services via a web browser (analogous to how you might test web services using a browser-based REST client).
