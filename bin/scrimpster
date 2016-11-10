@@ -36,12 +36,19 @@ if uri.host == nil and uri.port == nil
 end
 STDERR.puts "Submitting #{request_filename} to #{uri}..."
 
-response = Net::HTTP.start(uri.host, uri.port) { |http|
-  http.post uri.path, File.read(request_filename), {'Content-Type' => 'application/json'}
-}
+begin
+  response = Net::HTTP.start(uri.host, uri.port) { |http|
+    http.post uri.path, File.read(request_filename), {'Content-Type' => 'application/json'}
+  }
+rescue
+  puts "Is a scrimp server running? exit code 1"
+  exit!
+end
 
-unless response.code == '200'
-  STDERR.puts "!!! An error occurred !!!"
+unless Net::HTTPSuccess
+  puts "Expecting 2xx status code, but got #{response.code} exit code 1"
+  exit!
+  #STDERR.puts "!!! An error occurred !!!"
 else
   puts JSON.pretty_generate JSON.parse(response.body)
 end
