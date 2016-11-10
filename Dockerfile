@@ -14,10 +14,10 @@ RUN cd /opt &&\
     gem build scrimp.gemspec &&\
     gem install scrimp-1.0.0.gem
 
-RUN mkdir /thrift
+RUN mkdir /project
 
-WORKDIR /thrift
+WORKDIR /project
 
 EXPOSE 7000
 
-CMD [ "/usr/local/bin/scrimp", "/thrift" ]
+CMD [ "/usr/local/bin/scrimp", "/project/src" ]

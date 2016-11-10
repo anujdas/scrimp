@@ -1,11 +1,25 @@
-Scrimp on docker
+Some minor change from original project. 
+
+## Build
+
+To build and install scrimp locally:
+
+```sh
+~/scrimp $ gem build scrimp.gemspec
+~/scrimp $ gem install scrimp-1.0.0.gem
+~/scrimp $ scrimp
+```
+
+## Scrimp on docker
+
+Instead of installing it locally, to take advantage of docker container: 
 
 ```sh
 ~/scrimp $ docker build --tag scrimp .
-~/thrift-idl-project $ docker run --name scrimp-container -p 7000:7000 -v `pwd`/your_thrift_idl_dir:/thrift -d scrimp
+~/thrift-idl-project $ docker run --name scrimp-container -p 7000:7000 -v `pwd`:/project -d scrimp
 ```
 
-Original README 
+Then open `http://localhost:7000` on the host machine's browser.
 
 ---
 
