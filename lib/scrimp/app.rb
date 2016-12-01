@@ -49,8 +49,8 @@ module Scrimp
     end
 
     get '/protocols' do
-      protocols = {'Thrift::CompactProtocol'=>'Thrift::CompactProtocol',
-                   'Thrift::BinaryProtocol'=>'Thrift::BinaryProtocol'}
+      protocols = {'Thrift::BinaryProtocol'=>'Thrift::BinaryProtocol',
+                   'Thrift::CompactProtocol'=>'Thrift::CompactProtocol'}
       content_type :json
       protocols.to_json
     end

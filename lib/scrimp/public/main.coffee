@@ -4,9 +4,9 @@ default_request = ->
   request =
     service: (service for service of Scrimp.services)[0]
     protocol: (protocol for protocol of Scrimp.protocols)[0]
-    host: "localhost"
-    port: 9000
-    uri: "/customer/../binary"
+    host: "http://apigatewaystaging.commercelab.meshkorea.net"
+    port: 80
+    uri: "/customer/TYPE_HERE/binary"
     args: {}
   request.function = (func for func of Scrimp.services[request.service])[0]
   request
