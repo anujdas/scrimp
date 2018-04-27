@@ -40,5 +40,6 @@ Dir.mktmpdir do |out|
   $LOAD_PATH.delete out
 end
 
+puts "Open http://localhost:#{options[:port]} to view!"
 Scrimp::ThriftUtil.extend_structs
-Scrimp::App.run! :port => options[:port], :bind => '0.0.0.0'
+Scrimp::App.run!(host: '0.0.0.0', port: options[:port])
