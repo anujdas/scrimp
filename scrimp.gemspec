@@ -6,7 +6,7 @@ Gem::Specification.new do |gem|
   gem.email         = ["jacob.williams@cerner.com"]
   gem.description   = %q{Web UI for making requests to thrift services, given their IDL files.}
   gem.summary       = %q{Generic UI for thrift services.}
-  gem.homepage      = "https://github.com/cerner/scrimp"
+  gem.homepage      = "https://github.com/anujdas/scrimp"
   gem.licenses      = ['Apache-2.0']
 
   gem.files         = `git ls-files`.split($\)
@@ -16,9 +16,7 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = Scrimp::VERSION
 
-  gem.add_runtime_dependency 'thrift'
-  gem.add_runtime_dependency 'thin', '~> 1.6.0' # https://issues.apache.org/jira/browse/THRIFT-2145
-  gem.add_runtime_dependency 'haml', '~> 4.0.3'
-  gem.add_runtime_dependency 'json', '~> 1.8.1'
-  gem.add_runtime_dependency 'sinatra', '~> 1.4.4'
+  gem.add_runtime_dependency 'thrift', '~> 0.9'
+  gem.add_runtime_dependency 'haml', '~> 4.0'
+  gem.add_runtime_dependency 'sinatra', '~> 2.0'
 end

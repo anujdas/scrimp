@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 # coding: UTF-8
 
 require 'json'
@@ -8,112 +9,113 @@ module Scrimp
     set :static, true
     set :public_dir, File.expand_path('../public', __FILE__)
     set :views, File.expand_path('../views', __FILE__)
-    set :haml, :format => :html5
+    set :haml, format: :html5
+
+    PROTOCOLS = [Thrift::BinaryProtocol, Thrift::CompactProtocol, Thrift::JsonProtocol].freeze
 
     get '/' do
       haml :index
     end
 
     get '/services' do
-      response_map = {}
-      ThriftUtil.service_modules.each do |service|
-        functions = {}
-        ThriftUtil.service_functions(service).each do |function|
-          result_fields = ThriftUtil.service_result(service, function).const_get('FIELDS').dup
-          if result_fields.empty? || result_fields.all? {|_, field| field[:class] && ThriftUtil.qualified_const(field[:class].to_s) < Thrift::Exception}
-            returns = {type: 'VOID'}
-          else
-            returns = ThriftUtil.type_info(result_fields.delete(0)) # TODO shouldn't assume first is return?
-          end
-          throws = {}
-          result_fields.each do |(_, field)|
-            throws[field[:name]] = ThriftUtil.type_info field
-          end
+      # for each detected service...
+      responses = ThriftUtil.service_modules.each_with_object({}) do |service, service_h|
+        # for each detected RPC...
+        service_h[service] =
+          ThriftUtil.service_rpcs(service).each_with_object({}) do |rpc, rpc_hash|
+            # extract args and their types
+            args_fields = ThriftUtil.service_args(service, rpc)::FIELDS.values
+            args = args_fields.each_with_object({}) do |field, h|
+              h[field[:name]] = ThriftUtil.type_info(field)
+            end
 
-          args_fields = ThriftUtil.service_args(service, function).const_get('FIELDS')
-          args = {}
-          args_fields.each do |(_, field)|
-            args[field[:name]] = ThriftUtil.type_info field
+            # extract returns/exceptions and their types
+            result_fields = ThriftUtil.service_result(service, rpc)::FIELDS.values
+            returns =
+              if (success_field = result_fields.find { |f| f[:name] == 'success' })
+                ThriftUtil.type_info(success_field)
+              else
+                { type: 'VOID' } # no success field == returns void
+              end
+            throws = result_fields.each_with_object({}) do |field, h|
+              h[field[:name]] = ThriftUtil.type_info(field)
+            end
+
+            rpc_hash[rpc] = { args: args, returns: returns, throws: throws }
           end
-          functions[function] = {
-            :returns => returns,
-            :throws => throws,
-            :args => args
-          }
-        end
-        response_map[service] = functions
       end
 
       content_type :json
-      response_map.to_json
+      responses.to_json
     end
 
     get '/protocols' do
-      protocols = {'Thrift::BinaryProtocol'=>'Thrift::BinaryProtocol',
-                   'Thrift::CompactProtocol'=>'Thrift::CompactProtocol'}
       content_type :json
-      protocols.to_json
+      PROTOCOLS.each_with_object({}) { |p, h| h[p.name] = p.name }.to_json
     end
 
     get '/structs' do
-      structs = {}
-      ThriftUtil.all_structs.each do |struct|
-        fields = {}
-        struct.const_get('FIELDS').each do |(_, field)|
+      structs = ThriftUtil.all_structs.each_with_object({}) do |struct, h|
+        h[struct] = struct::FIELDS.values.each_with_object({}) do |field, fields|
           fields[field[:name]] = ThriftUtil.type_info(field)
         end
-        structs[struct] = fields
       end
+
       content_type :json
       structs.to_json
     end
 
     post '/invoke' do
-      response_map = {}
+      invocation =
+        if request.content_type == 'application/x-www-form-urlencoded' # yes it's lame
+          JSON.parse(params['request-json'])
+        else
+          JSON.parse(request.body.read)
+        end
+      rpc = invocation['rpc']
+      service_class = ThriftUtil.qualified_const(invocation['service'])
+      args_class = ThriftUtil.service_args(service_class, rpc)
+      result_class = ThriftUtil.service_result(service_class, rpc)
 
-      if request.content_type == 'application/x-www-form-urlencoded' # yes it's lame
-        invocation = JSON.parse params['request-json']
-      else
-        invocation = JSON.parse request.body.read
+      # extract args in order (thanks, sorted hashes)
+      args = args_class::FIELDS.values.map do |field|
+        if (arg_val = invocation['args'][field[:name]])
+          args_class.json_type_to_thrift_type(arg_val, field)
+        end
       end
-      service_class = ThriftUtil.qualified_const invocation['service']
-      args_class = ThriftUtil.service_args service_class, invocation['function']
-      result_class = ThriftUtil.service_result service_class, invocation['function']
 
-      args = args_class.const_get('FIELDS').sort.map do |(_, field_info)|
-        arg = invocation['args'][field_info[:name]]
-        if arg != nil
-          args_class.json_type_to_thrift_type arg, field_info
-        end
-      end.compact
-
+      response = {}
       begin
-        transport = Thrift::HTTPClientTransport.new (invocation['host'] + (invocation['port'] ? ':' + invocation['port'] : '') + invocation['uri'])
-        protocol_class = ThriftUtil.qualified_const invocation['protocol']
-        protocol = protocol_class.new transport
-        client = service_class.const_get('Client').new protocol
+        socket = Thrift::Socket.new(invocation['host'], invocation['port'])
+        transport = Thrift::FramedTransport.new(socket)
+        protocol = ThriftUtil.qualified_const(invocation['protocol']).new(transport)
+        client = service_class::Client.new(protocol)
+
         transport.open
-        result = client.send invocation['function'], *args
-        if return_type = result_class.const_get('FIELDS')[0]
-          response_map[:return] = ThriftUtil.thrift_type_to_json_type result, return_type
-        else # void
-          response_map[:return] = nil
-        end
-      rescue Thrift::ApplicationException => ex
-        response_map[ex.class] = {
-          :type => ThriftUtil.application_exception_type_string(ex.type),
-          :message => ex.message
+
+        # make request
+        result = client.public_send(invocation['rpc'], *args)
+        # store result if successful (or null, if return type was 'void')
+        response[:return] =
+          if (success_field = result_class::FIELDS.values.find { |f| f[:name] == 'success' })
+            ThriftUtil.thrift_type_to_json_type(result, success_field)
+          end
+      rescue Thrift::ApplicationException => e
+        # a thrift exception (not a schema exception, but something else) occurred
+        response[e.class.name] = {
+          type: ThriftUtil.application_exception_type_string(e.type),
+          message: e.message,
         }
-      rescue Thrift::Exception => ex
-        # this is untested
-        raise ex unless ex.class < Thrift::Struct
-        response_map[ex.class] = ThriftUtil.thrift_struct_to_json_map(ex, ex.class)
+      rescue => e
+        raise e unless e.is_a?(Thrift::Struct_Union) # something unknown happened
+        # save RPC-schema-defined exceptions
+        response[e.class.name] = ThriftUtil.thrift_struct_to_json_map(e, e.class)
       ensure
         transport.close if transport
       end
 
       content_type :json
-      response_map.to_json
+      response.to_json
     end
   end
 end

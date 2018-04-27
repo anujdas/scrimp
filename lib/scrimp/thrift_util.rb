@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 # coding: UTF-8
 
 module Scrimp
@@ -7,7 +8,7 @@ module Scrimp
       # no, it really doesn't belong here
       # but life will almost certainly go on
       def qualified_const(name)
-        name.split('::').inject(Object) {|obj, name| obj.const_get(name)}
+        name.split('::').inject(Object) { |obj, name| obj.const_get(name) }
       end
 
       def application_exception_type_string(type)
@@ -36,46 +37,30 @@ module Scrimp
       # For every Thrift service, the code generator produces a module. This
       # returns a list of all such modules currently loaded.
       def service_modules
-        modules = []
-        ObjectSpace.each_object(Module) do |clazz|
-          if clazz < Thrift::Client
-            modules << qualified_const(clazz.name.split('::')[0..-2].join('::')) # i miss activesupport...
-          end
-        end
-        modules.delete(Thrift)
-        modules
+        ObjectSpace.each_object(Module).
+          select { |klass| klass != Thrift && klass < Thrift::Client }.
+          map { |klass| qualified_const(klass.name.split('::')[0..-2].join('::')) }
       end
 
       # Given a service module (see service_modules above), returns a list of the names of all
-      # the functions of that Thrift service.
-      def service_functions(service_module)
-        methods = service_module.const_get('Client').instance_methods.map {|method| method.to_s}
-        methods.select do |method|
-          send_exists = methods.include? "send_#{method}"
-          upped = method.dup
-          upped[0..0] = method[0..0].upcase
-          begin
-            send_exists && service_module.const_get("#{upped}_args")
-          rescue
-            false
-          end
-        end
+      # the RPCs of that Thrift service.
+      def service_rpcs(service_module)
+        service_module::Client.instance_methods.
+          select { |m| m =~ /^send_/ }.
+          map { |m| m.to_s.sub('send_', '') }.
+          select { |m| service_module.const_defined?("#{m.capitalize}_args") }
       end
 
-      # Given a service module (see service_modules above) and a Thrift function name,
-      # returns the class for the structure representing the function's arguments.
-      def service_args(service_module, function_name)
-        function_name = function_name.dup
-        function_name[0..0] = function_name[0..0].upcase
-        service_module.const_get("#{function_name}_args")
+      # Given a service module (see service_modules above) and a Thrift RPC name,
+      # returns the class for the structure representing the RPC's arguments.
+      def service_args(service_module, rpc_name)
+        service_module.const_get("#{rpc_name.capitalize}_args")
       end
 
-      # Given a service module (see service_modules above) and a Thrift function name,
-      # returns the class for the structure representing the function's return value.
-      def service_result(service_module, function_name)
-        function_name = function_name.dup
-        function_name[0..0] = function_name[0..0].upcase
-        service_module.const_get("#{function_name}_result")
+      # Given a service module (see service_modules above) and a Thrift RPC name,
+      # returns the class for the structure representing the RPC's return value.
+      def service_result(service_module, rpc_name)
+        service_module.const_get("#{rpc_name.capitalize}_result")
       end
 
       # Returns a list of the classes for all Thrift structures that were loaded
@@ -88,33 +73,25 @@ module Scrimp
       # for building them from hashes, and saves the list of them for
       # future reference.
       def extend_structs
-        @@all_structs = []
-        ObjectSpace.each_object(Module) do |clazz|
-          if Thrift::Struct > clazz || Thrift::Union > clazz
-            clazz.extend(JsonThrift)
-            @@all_structs << clazz
-          end
-        end
+        @@all_structs = ObjectSpace.each_object(Module).
+          select { |klass| Thrift::Struct > klass || Thrift::Union > klass }
+        @@all_structs.each { |klass| klass.extend(JsonThrift) }
       end
 
       # Converts a Thrift struct to a hash (suitable for conversion to json).
-      def thrift_struct_to_json_map(value, clazz)
-        result = {}
-        clazz.const_get('FIELDS').each do |(_, struct_field)|
-          name = struct_field[:name]
-          val = value.send(name)
-          result[name] = thrift_type_to_json_type(val, struct_field) if val
+      def thrift_struct_to_json_map(struct, klass)
+        klass::FIELDS.values.each_with_object({}) do |field, h|
+          val = struct.public_send(field[:name])
+          h[field[:name]] = thrift_type_to_json_type(val, field) if val
         end
-        result
       end
 
       # Converts a Thrift union to a hash (suitable for conversion to json).
-      def thrift_union_to_json_map(value, clazz)
-        result = {}
-        name = value.get_set_field.to_s
-        struct_field = clazz.const_get('FIELDS').find{|x| x[1][:name] == name}[1]
-        result[name] = thrift_type_to_json_type(value.get_value, struct_field)
-        result
+      def thrift_union_to_json_map(union, klass)
+        set_field = union.get_set_field.to_s
+        field = klass::FIELDS.values.find { |f| f[:name] == set_field }
+
+        { set_field => thrift_type_to_json_type(union.get_value, field) }
       end
 
       # Converts a Thrift value to a primitive, list, or hash (suitable for conversion to json).
@@ -122,28 +99,23 @@ module Scrimp
       def thrift_type_to_json_type(value, field)
         type = Thrift.type_name(field[:type])
         raise Thrift::TypeError.new("Type for #{field.inspect} not found.") unless type
-        type.sub!('Types::', '')
-        result = value
-        type = 'UNION' if type == 'STRUCT' && field[:class].ancestors.any?{|x| x == Thrift::Union}
-        if type == 'STRUCT'
-          result = thrift_struct_to_json_map(value, field[:class])
-          # field[:class].const_get('FIELDS').each do |(_, struct_field)|
-          #   name = struct_field[:name]
-          #   val = value.send(name)
-          #   result[name] = thrift_type_to_json_type(val, struct_field) if val
-          # end
-        elsif type == 'LIST' || type == 'SET'
-          result = value.map {|val| thrift_type_to_json_type val, field[:element]}
-        elsif type == 'MAP'
-          result = value.map do |key, val|
+
+        case type.sub('Types::', '')
+        when 'STRUCT'
+          if field[:class] < Thrift::Union
+            thrift_union_to_json_map(value, field[:class])
+          else
+            thrift_struct_to_json_map(value, field[:class])
+          end
+        when 'LIST', 'SET'
+          value.map { |e| thrift_type_to_json_type(e, field[:element]) }
+        when 'MAP'
+          value.map do |key, val|
             [thrift_type_to_json_type(key, field[:key]), thrift_type_to_json_type(val, field[:value])]
           end
-        elsif enum = field[:enum_class]
-          result = enum.const_get('VALUE_MAP')[value] || value
-        elsif type == 'UNION'
-          result = thrift_union_to_json_map(value, field[:class])
+        else
+          (field[:enum_class] && field[:enum_class]::VALUE_MAP[value]) || value
         end
-        result
       end
 
       # Given a field description (as found in the FIELDS constant of a Thrift struct class),

@@ -19,8 +19,8 @@
               %label.service-field{:name => 'service'} Service
               %select.service-field{:name => 'service'}
             .field
-              %label.function-field{:name => 'function'} Function
-              %select.function-field{:name => 'function'}
+              %label.rpc-field{:name => 'rpc'} RPC
+              %select.rpc-field{:name => 'rpc'}
             .field
               %label.protocol-field{:name => 'protocol'} Protocol
               %select.protocol-field{:name => 'protocol'}
@@ -30,9 +30,6 @@
             .field
               %label.port-field{:name => 'port'} Port
               %input.port-field{:name => 'port', :type => 'text'}
-            .field
-              %label.uri-field{:name => 'uri'} Uri
-              %input.uri-field{:name => 'uri', :type => 'text'}
             %ul.args-field.struct-field
           .raw-request
             %a.show-structured-request{:href => '#'} use structured editor

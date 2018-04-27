@@ -4,16 +4,15 @@ default_request = ->
   request =
     service: (service for service of Scrimp.services)[0]
     protocol: (protocol for protocol of Scrimp.protocols)[0]
-    host: "http://apigatewaystaging.commercelab.meshkorea.net"
+    host: "example.com"
     port: 80
-    uri: "/customer/TYPE_HERE/binary"
     args: {}
-  request.function = (func for func of Scrimp.services[request.service])[0]
+  request.rpc = (rpc for rpc of Scrimp.services[request.service])[0]
   request
 
 load_services = (data) ->
   Scrimp.services = data
-  for service, functions of Scrimp.services
+  for service, rpcs of Scrimp.services
     option = $('<option>').val(service).text(service)
     $('select.service-field').append(option)
 
@@ -27,13 +26,13 @@ load_protocols = (data) ->
      $('select.protocol-field').append(option)
 
 service_changed = ->
-  $('select.function-field').empty()
+  $('select.rpc-field').empty()
   service = Scrimp.services[$('select.service-field').val()]
   if service
-    for func, desc of Scrimp.services[$('select.service-field').val()]
-      option = $('<option>').val(func).text(func)
-      $('select.function-field').append(option)
-  function_changed()
+    for rpc, desc of Scrimp.services[$('select.service-field').val()]
+      option = $('<option>').val(rpc).text(rpc)
+      $('select.rpc-field').append(option)
+  rpc_changed()
 
 type_info = (info) ->
   $type = $('<span>').addClass('type-info')
@@ -129,10 +128,10 @@ populate_struct = ($struct, fields, values) ->
     if info.optional then $li.append($include)
     $struct.append $li.append($label).append($type).append($input)
 
-function_changed = ->
+rpc_changed = ->
   $('.args-field').empty()
   populate_struct $('.args-field'),
-                  Scrimp.services[$('select.service-field').val()][$('select.function-field').val()].args,
+                  Scrimp.services[$('select.service-field').val()][$('select.rpc-field').val()].args,
                   Scrimp.last_json.args
 
 load_structured_request = ->
@@ -143,17 +142,16 @@ load_structured_request = ->
 
   if not (parsed.service of Scrimp.services)
     return confirm("Invalid service; changes will be lost!")
-  if not (parsed.function of Scrimp.services[parsed.service])
-    return confirm("Invalid function; changes will be lost!")
+  if not (parsed.rpc of Scrimp.services[parsed.service])
+    return confirm("Invalid RPC; changes will be lost!")
 
   $('select.service-field').val(parsed.service)
   service_changed()
-  $('select.function-field').val(parsed.function)
-  function_changed()
+  $('select.rpc-field').val(parsed.rpc)
+  rpc_changed()
   $('select.protocol-field').val(parsed.protocol)
   $('input.host-field').val(parsed.host)
   $('input.port-field').val(parsed.port)
-  $('input.uri-field').val(parsed.uri)
   true
 
 build_json_for_field = ($el) ->
@@ -189,11 +187,10 @@ build_json_for_field = ($el) ->
 build_raw_request = ->
   request =
     service: $('select.service-field').val()
-    function: $('select.function-field').val()
+    rpc: $('select.rpc-field').val()
     protocol: $('select.protocol-field').val()
     host: $('input.host-field').val()
     port: $('input.port-field').val()
-    uri: $('input.uri-field').val()
     args: build_json_for_field($('.args-field'))
   request
 
@@ -254,7 +251,7 @@ populate_structured_response = (request, response) ->
   if response.return != undefined
     $('.response-error').hide()
     $('.response-success').show()
-    $details.append build_response_element(response.return, Scrimp.services[request.service][request.function].returns)
+    $details.append build_response_element(response.return, Scrimp.services[request.service][request.rpc].returns)
   else
     $('.response-success').hide()
     for err, details of response # there's only one. this is awkward
@@ -284,7 +281,7 @@ $ ->
     url: '/protocols'
     async: false
   $('select.service-field').change(service_changed)
-  $('select.function-field').change(function_changed)
+  $('select.rpc-field').change(rpc_changed)
   $('.request-json').val(JSON.stringify(default_request(), null, 2))
   $('.show-raw-request').click ->
     load_raw_request()
